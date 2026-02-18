@@ -1,0 +1,781 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Habit Tracker + Dashboard</title>
+
+  <!-- Chart.js (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <style>
+    :root{
+      --bg:#0b1020;
+      --panel:rgba(255,255,255,0.06);
+      --panel2:rgba(255,255,255,0.09);
+      --text:rgba(255,255,255,0.92);
+      --muted:rgba(255,255,255,0.65);
+      --border:rgba(255,255,255,0.12);
+      --good:#20c997;
+      --warn:#ffd43b;
+      --bad:#ff6b6b;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      background: radial-gradient(1200px 700px at 20% 10%, #18265a 0%, transparent 55%),
+                  radial-gradient(900px 500px at 90% 30%, #3b1a4f 0%, transparent 50%),
+                  var(--bg);
+      color:var(--text);
+      min-height:100vh;
+    }
+    .wrap{max-width:1100px;margin:0 auto;padding:24px}
+    header{display:flex;gap:16px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap}
+    h1{margin:0;font-size:22px}
+    .sub{margin-top:6px;color:var(--muted);font-size:13px;max-width:720px}
+    .pill{
+      padding:12px;
+      border:1px solid var(--border);
+      background:linear-gradient(to bottom,var(--panel),transparent);
+      border-radius:14px;
+      min-width: 320px;
+    }
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    button,input,select{
+      font:inherit;color:var(--text);
+      background:rgba(255,255,255,0.06);
+      border:1px solid var(--border);
+      padding:10px 12px;border-radius:12px;outline:none;
+    }
+    input::placeholder{color:rgba(255,255,255,0.4)}
+    button{cursor:pointer}
+    button:hover{background:rgba(255,255,255,0.10)}
+    .danger{border-color:rgba(255,107,107,0.35)}
+    .danger:hover{background:rgba(255,107,107,0.15)}
+    .tabs{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+    .tabBtn{
+      border:1px solid var(--border);
+      background:rgba(255,255,255,0.05);
+      padding:10px 12px;border-radius:999px;
+    }
+    .tabBtn.active{
+      background:rgba(255,255,255,0.12);
+      border-color:rgba(255,255,255,0.20);
+    }
+
+    main{margin-top:14px}
+    .grid2{display:grid;grid-template-columns:1fr;gap:14px}
+    @media (min-width: 900px){ .grid2{grid-template-columns:1.2fr 0.8fr} }
+    .card{
+      border:1px solid var(--border);
+      background:linear-gradient(to bottom,var(--panel2),transparent);
+      border-radius:16px;padding:14px;overflow:hidden;
+    }
+    .card h2{margin:0 0 10px;font-size:16px;color:rgba(255,255,255,0.88)}
+    .small{font-size:12px;color:var(--muted)}
+    .split{display:flex;gap:12px;flex-wrap:wrap}
+    .stat{
+      flex:1 1 160px;
+      border:1px solid var(--border);
+      border-radius:14px;
+      padding:10px 12px;
+      background:rgba(255,255,255,0.05);
+    }
+    .stat .k{font-size:12px;color:var(--muted)}
+    .stat .v{font-size:18px;font-weight:800;margin-top:2px}
+    .stat .s{font-size:12px;color:rgba(255,255,255,0.72);margin-top:2px}
+
+    .habit{
+      border:1px solid var(--border);
+      border-radius:14px;
+      padding:12px;
+      background:rgba(0,0,0,0.10);
+    }
+    .habitTop{display:flex;justify-content:space-between;align-items:center;gap:10px}
+    .name{display:flex;align-items:center;gap:10px;min-width:0}
+    .dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto}
+    .title{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .meta{font-size:12px;color:var(--muted);margin-top:4px}
+    .toggleRow{display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap}
+    .check{
+      display:flex;align-items:center;gap:10px;
+      padding:10px 12px;border-radius:12px;border:1px solid var(--border);
+      background:rgba(255,255,255,0.05);width:fit-content;
+    }
+    .check input{width:18px;height:18px}
+    .history{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+    .day{
+      width:26px;height:26px;border-radius:9px;
+      border:1px solid var(--border);
+      display:flex;align-items:center;justify-content:center;
+      font-size:11px;color:rgba(255,255,255,0.72);
+      background:rgba(255,255,255,0.04);user-select:none;
+    }
+    .day.done{background:rgba(32,201,151,0.22);border-color:rgba(32,201,151,0.35);color:rgba(255,255,255,0.9)}
+    .day.missed{background:rgba(255,107,107,0.16);border-color:rgba(255,107,107,0.28)}
+    .day.today{box-shadow:0 0 0 2px rgba(255,212,59,0.28) inset}
+    .fileInput{display:none}
+    .hide{display:none}
+
+    .chartWrap{
+      border:1px solid var(--border);
+      border-radius:14px;
+      padding:12px;
+      background:rgba(255,255,255,0.05);
+    }
+    .chartHeader{
+      display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;
+      margin-bottom:8px;
+    }
+    .badge{
+      display:inline-flex;align-items:center;gap:8px;
+      padding:8px 10px;border-radius:999px;
+      border:1px solid var(--border);
+      background:rgba(0,0,0,0.12);
+      font-size:12px;color:rgba(255,255,255,0.85);
+    }
+    .hint{color:var(--muted);font-size:12px;margin-top:8px}
+    hr{border:0;border-top:1px solid var(--border);margin:14px 0}
+    code{color:rgba(255,255,255,0.85)}
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Daily Habit Tracker + Dashboard</h1>
+        <div class="sub">
+          Track habits daily and see your “life performance” trend like a stock chart: overall completion + per-habit lines, moving averages, streaks, and accountability score.
+        </div>
+
+        <div class="tabs">
+          <button id="tabToday" class="tabBtn active">Today</button>
+          <button id="tabAnalytics" class="tabBtn">Analytics</button>
+        </div>
+      </div>
+
+      <div class="pill">
+        <div class="row" style="margin-bottom:10px;">
+          <input id="habitName" placeholder="Add a habit (e.g., Walk 20 min)" maxlength="60" />
+          <input id="habitColor" type="color" value="#20c997" title="Color" style="height:40px; padding:6px 8px;" />
+          <button id="addHabitBtn">Add</button>
+        </div>
+
+        <div class="row" style="margin-bottom:10px;">
+          <label class="small">Window</label>
+          <select id="windowDays">
+            <option value="14">14 days</option>
+            <option value="30" selected>30 days</option>
+            <option value="90">90 days</option>
+          </select>
+          <label class="small">Trend</label>
+          <select id="trendType">
+            <option value="ma7" selected>7-day avg</option>
+            <option value="ma14">14-day avg</option>
+            <option value="none">None</option>
+          </select>
+        </div>
+
+        <div class="row">
+          <button id="exportBtn">Export</button>
+          <button id="importBtn">Import</button>
+          <input id="importFile" class="fileInput" type="file" accept="application/json" />
+          <button id="resetBtn" class="danger">Reset All</button>
+        </div>
+        <div class="small" style="margin-top:10px;">Tip: Export weekly so you never lose data.</div>
+      </div>
+    </header>
+
+    <main>
+      <!-- TODAY VIEW -->
+      <section id="viewToday" class="grid2">
+        <section class="card">
+          <h2>Today</h2>
+          <div id="todayLabel" class="small"></div>
+          <div id="habitList" style="display:grid; gap:10px; margin-top:10px;"></div>
+        </section>
+
+        <aside class="card">
+          <h2>Quick Stats</h2>
+          <div class="split" id="statsToday"></div>
+          <div class="hint">
+            Tap “Analytics” for your stock-style trend graph and habit-by-habit performance lines.
+          </div>
+          <hr>
+          <div class="small">
+            Data stored locally in your browser (<code>localStorage</code>). Works offline.
+          </div>
+        </aside>
+      </section>
+
+      <!-- ANALYTICS VIEW -->
+      <section id="viewAnalytics" class="hide" style="display:grid; gap:14px;">
+        <section class="card">
+          <div class="chartHeader">
+            <div>
+              <h2 style="margin:0;">Dashboard</h2>
+              <div class="small" id="analyticsLabel"></div>
+            </div>
+            <div class="badge" id="levelBadge">Level 1 • Consistency 0</div>
+          </div>
+
+          <div class="split" id="statsAnalytics" style="margin-bottom:12px;"></div>
+
+          <div class="chartWrap">
+            <div class="chartHeader">
+              <div>
+                <div style="font-weight:700;">Overall Performance</div>
+                <div class="small">Daily completion % (your “Life Stock”)</div>
+              </div>
+              <div class="badge" id="trendBadge">Trend: —</div>
+            </div>
+            <canvas id="chartOverall" height="110"></canvas>
+            <div class="hint">Tip: look for higher lows + higher highs. That’s real momentum.</div>
+          </div>
+
+          <div style="height:12px;"></div>
+
+          <div class="chartWrap">
+            <div class="chartHeader">
+              <div>
+                <div style="font-weight:700;">Habit Lines</div>
+                <div class="small">Each habit is 0% or 100% each day</div>
+              </div>
+              <div class="badge" id="habitsBadge">Habits: 0</div>
+            </div>
+            <canvas id="chartHabits" height="130"></canvas>
+            <div class="hint">This shows which habits are “carrying” your accountability and which are breaking.</div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Insights</h2>
+          <div id="insights" class="small"></div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+<script>
+  // -------------------------
+  // Storage model
+  // -------------------------
+  // state = { habits: [{ id, name, color, createdAt }], logs: { [dateKey]: { [habitId]: true } } }
+  const STORAGE_KEY = "habit_tracker_state_v2";
+  const $ = (sel) => document.querySelector(sel);
+
+  const habitListEl = $("#habitList");
+  const statsTodayEl = $("#statsToday");
+  const statsAnalyticsEl = $("#statsAnalytics");
+  const todayLabelEl = $("#todayLabel");
+  const analyticsLabelEl = $("#analyticsLabel");
+  const insightsEl = $("#insights");
+
+  const tabTodayBtn = $("#tabToday");
+  const tabAnalyticsBtn = $("#tabAnalytics");
+  const viewToday = $("#viewToday");
+  const viewAnalytics = $("#viewAnalytics");
+
+  const windowDaysSel = $("#windowDays");
+  const trendTypeSel = $("#trendType");
+
+  const levelBadgeEl = $("#levelBadge");
+  const trendBadgeEl = $("#trendBadge");
+  const habitsBadgeEl = $("#habitsBadge");
+
+  let overallChart = null;
+  let habitsChart = null;
+
+  function todayKey(d = new Date()) {
+    const yr = d.getFullYear();
+    const mo = String(d.getMonth() + 1).padStart(2, "0");
+    const da = String(d.getDate()).padStart(2, "0");
+    return `${yr}-${mo}-${da}`;
+  }
+  function addDays(date, delta){ const d = new Date(date); d.setDate(d.getDate()+delta); return d; }
+  function lastNDaysKeys(n, endDate = new Date()){
+    const keys=[];
+    for(let i=n-1;i>=0;i--) keys.push(todayKey(addDays(endDate,-i)));
+    return keys;
+  }
+  function formatNiceDate(dateKey){
+    const [y,m,d] = dateKey.split("-").map(Number);
+    const dt = new Date(y,m-1,d);
+    return dt.toLocaleDateString(undefined,{weekday:"long", year:"numeric", month:"short", day:"numeric"});
+  }
+
+  function loadState(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return { habits: [], logs: {} };
+      const parsed = JSON.parse(raw);
+      parsed.habits ??= [];
+      parsed.logs ??= {};
+      return parsed;
+    }catch{ return { habits: [], logs: {} }; }
+  }
+  function saveState(state){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+  let state = loadState();
+
+  function isDone(dateKey, habitId){
+    return !!(state.logs[dateKey] && state.logs[dateKey][habitId]);
+  }
+  function setDone(dateKey, habitId, done){
+    state.logs[dateKey] = state.logs[dateKey] || {};
+    state.logs[dateKey][habitId] = !!done;
+    saveState(state);
+  }
+
+  function cryptoRandomId(){
+    const arr = new Uint8Array(8);
+    crypto.getRandomValues(arr);
+    return [...arr].map(b=>b.toString(16).padStart(2,"0")).join("");
+  }
+  function escapeHtml(str){
+    return String(str).replace(/[&<>"']/g, s => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+    }[s]));
+  }
+
+  // -------------------------
+  // Metrics
+  // -------------------------
+  function dailyCompletionPct(dateKey){
+    const total = state.habits.length;
+    if(total === 0) return 0;
+    const done = state.habits.filter(h=>isDone(dateKey,h.id)).length;
+    return Math.round((done/total)*100);
+  }
+
+  function movingAverage(values, window){
+    const out = [];
+    for(let i=0;i<values.length;i++){
+      let sum=0, count=0;
+      for(let j=i-window+1;j<=i;j++){
+        if(j>=0){ sum += values[j]; count++; }
+      }
+      out.push(Math.round(sum / count));
+    }
+    return out;
+  }
+
+  function calcStreak(habitId, endDate=new Date()){
+    let streak=0;
+    for(let i=0;i<3650;i++){
+      const k=todayKey(addDays(endDate,-i));
+      if(isDone(k, habitId)) streak++;
+      else break;
+    }
+    return streak;
+  }
+
+  function bestStreak(){
+    let best=0;
+    for(const h of state.habits) best = Math.max(best, calcStreak(h.id));
+    return best;
+  }
+
+  function avgCompletion(days){
+    const keys = lastNDaysKeys(days);
+    if(state.habits.length===0) return 0;
+    let sum=0;
+    for(const k of keys) sum += dailyCompletionPct(k);
+    return Math.round(sum/keys.length);
+  }
+
+  function consistencyScore(days){
+    // A “gamey” score: average completion + bonus for best streak (capped)
+    const avg = avgCompletion(days);
+    const streakBonus = Math.min(20, bestStreak()*2); // up to +20
+    return Math.min(100, avg + streakBonus);
+  }
+
+  function levelFromScore(score){
+    // simple level curve
+    if(score >= 90) return 5;
+    if(score >= 75) return 4;
+    if(score >= 60) return 3;
+    if(score >= 40) return 2;
+    return 1;
+  }
+
+  // -------------------------
+  // Render: Today
+  // -------------------------
+  function renderToday(){
+    const tKey = todayKey();
+    todayLabelEl.textContent = formatNiceDate(tKey);
+
+    habitListEl.innerHTML = "";
+    if(state.habits.length===0){
+      habitListEl.innerHTML = `<div class="small" style="padding:10px 2px;">Add your first habit above (e.g., “Walk 20 min”, “Read 10 pages”, “No soda”).</div>`;
+    } else {
+      for(const habit of state.habits){
+        const streak = calcStreak(habit.id);
+        const doneToday = isDone(tKey, habit.id);
+        const histKeys = lastNDaysKeys(14);
+        const hist = histKeys.map(k=>({ key:k, done:isDone(k,habit.id), isToday:k===tKey }));
+
+        const wrap=document.createElement("div");
+        wrap.className="habit";
+        wrap.innerHTML = `
+          <div class="habitTop">
+            <div class="name">
+              <span class="dot" style="background:${habit.color}"></span>
+              <div style="min-width:0;">
+                <div class="title">${escapeHtml(habit.name)}</div>
+                <div class="meta">Streak: <b>${streak}</b> day${streak===1?"":"s"}</div>
+              </div>
+            </div>
+            <div class="row">
+              <button data-del="${habit.id}" class="danger">Delete</button>
+            </div>
+          </div>
+
+          <div class="toggleRow">
+            <label class="check">
+              <input type="checkbox" data-check="${habit.id}" ${doneToday?"checked":""} />
+              <span>Done today</span>
+            </label>
+            <span class="small">Tap boxes below to edit past days</span>
+          </div>
+
+          <div class="history">
+            ${hist.map(h=>{
+              const dayNum = h.key.split("-")[2];
+              const cls = ["day", h.done?"done":"missed", h.isToday?"today":""].join(" ");
+              return `<div class="${cls}" data-day="${habit.id}|${h.key}" title="${formatNiceDate(h.key)}">${dayNum}</div>`;
+            }).join("")}
+          </div>
+        `;
+        habitListEl.appendChild(wrap);
+      }
+    }
+
+    // Quick stats
+    const todayPct = dailyCompletionPct(tKey);
+    const avg7 = avgCompletion(7);
+    const avg30 = avgCompletion(30);
+    const best = bestStreak();
+    const score = consistencyScore(30);
+
+    statsTodayEl.innerHTML = `
+      <div class="stat">
+        <div class="k">Today</div>
+        <div class="v">${todayPct}%</div>
+        <div class="s">${state.habits.length ? `${state.habits.filter(h=>isDone(tKey,h.id)).length}/${state.habits.length} done` : "Add habits to start"}</div>
+      </div>
+      <div class="stat">
+        <div class="k">7-day avg</div>
+        <div class="v">${avg7}%</div>
+        <div class="s">Short-term trend</div>
+      </div>
+      <div class="stat">
+        <div class="k">30-day avg</div>
+        <div class="v">${avg30}%</div>
+        <div class="s">Consistency baseline</div>
+      </div>
+      <div class="stat">
+        <div class="k">Best streak</div>
+        <div class="v">${best}</div>
+        <div class="s">Longest current streak</div>
+      </div>
+      <div class="stat">
+        <div class="k">Consistency score</div>
+        <div class="v">${score}</div>
+        <div class="s">Avg + streak bonus</div>
+      </div>
+    `;
+
+    wireTodayEvents();
+  }
+
+  function wireTodayEvents(){
+    document.querySelectorAll("[data-del]").forEach(btn=>{
+      btn.onclick=()=>{
+        const id = btn.getAttribute("data-del");
+        state.habits = state.habits.filter(h=>h.id!==id);
+        saveState(state);
+        renderAll();
+      };
+    });
+
+    document.querySelectorAll("[data-check]").forEach(cb=>{
+      cb.onchange=()=>{
+        const id = cb.getAttribute("data-check");
+        setDone(todayKey(), id, cb.checked);
+        renderAll();
+      };
+    });
+
+    document.querySelectorAll("[data-day]").forEach(cell=>{
+      cell.onclick=()=>{
+        const [habitId, dateKey] = cell.getAttribute("data-day").split("|");
+        const next = !isDone(dateKey, habitId);
+        setDone(dateKey, habitId, next);
+        renderAll();
+      };
+    });
+  }
+
+  // -------------------------
+  // Render: Analytics
+  // -------------------------
+  function renderAnalytics(){
+    const days = Number(windowDaysSel.value);
+    const trendType = trendTypeSel.value;
+
+    const keys = lastNDaysKeys(days);
+    analyticsLabelEl.textContent = `Window: last ${days} days • ${formatNiceDate(keys[0])} → ${formatNiceDate(keys[keys.length-1])}`;
+
+    const overall = keys.map(k=>dailyCompletionPct(k));
+    const ma = (trendType==="ma7") ? movingAverage(overall, 7)
+            : (trendType==="ma14") ? movingAverage(overall, 14)
+            : null;
+
+    const todayPct = dailyCompletionPct(todayKey());
+    const avg7 = avgCompletion(7);
+    const avg30 = avgCompletion(30);
+    const best = bestStreak();
+    const score = consistencyScore(days);
+    const level = levelFromScore(score);
+
+    levelBadgeEl.textContent = `Level ${level} • Consistency ${score}`;
+    habitsBadgeEl.textContent = `Habits: ${state.habits.length}`;
+
+    // Trend badge: compare last 7 days vs previous 7 days (if possible)
+    const trendText = computeTrendText(keys, overall);
+    trendBadgeEl.textContent = `Trend: ${trendText}`;
+
+    statsAnalyticsEl.innerHTML = `
+      <div class="stat"><div class="k">Today</div><div class="v">${todayPct}%</div><div class="s">Today’s execution</div></div>
+      <div class="stat"><div class="k">7-day avg</div><div class="v">${avg7}%</div><div class="s">Momentum</div></div>
+      <div class="stat"><div class="k">30-day avg</div><div class="v">${avg30}%</div><div class="s">Baseline</div></div>
+      <div class="stat"><div class="k">Best streak</div><div class="v">${best}</div><div class="s">Current max</div></div>
+      <div class="stat"><div class="k">Consistency score</div><div class="v">${score}</div><div class="s">Gamified</div></div>
+    `;
+
+    // Build charts
+    const labels = keys.map(k => k.slice(5)); // MM-DD
+
+    // Overall chart datasets
+    const dsOverall = [
+      {
+        label: "Daily %",
+        data: overall,
+        borderWidth: 2,
+        tension: 0.25,
+        pointRadius: 2,
+      }
+    ];
+    if(ma){
+      dsOverall.push({
+        label: trendType === "ma14" ? "14-day avg" : "7-day avg",
+        data: ma,
+        borderWidth: 2,
+        tension: 0.25,
+        pointRadius: 0
+      });
+    }
+
+    overallChart = makeOrUpdateLineChart(
+      overallChart,
+      $("#chartOverall"),
+      labels,
+      dsOverall,
+      { yTitle: "% Complete", yMin: 0, yMax: 100 }
+    );
+
+    // Habit lines: each habit is 0/100 per day
+    const habitDatasets = state.habits.map(h => ({
+      label: h.name,
+      data: keys.map(k => isDone(k, h.id) ? 100 : 0),
+      borderWidth: 2,
+      tension: 0.15,
+      pointRadius: 0
+    }));
+
+    habitsChart = makeOrUpdateLineChart(
+      habitsChart,
+      $("#chartHabits"),
+      labels,
+      habitDatasets,
+      { yTitle: "Done", yMin: 0, yMax: 100 }
+    );
+
+    // Insights block (simple + useful)
+    insightsEl.innerHTML = buildInsights(keys, overall);
+  }
+
+  function computeTrendText(keys, overall){
+    if(keys.length < 14) return "Not enough data";
+    const last7 = overall.slice(-7);
+    const prev7 = overall.slice(-14,-7);
+    const a = Math.round(last7.reduce((s,v)=>s+v,0)/last7.length);
+    const b = Math.round(prev7.reduce((s,v)=>s+v,0)/prev7.length);
+    const delta = a - b;
+    if(delta > 3) return `Up (+${delta})`;
+    if(delta < -3) return `Down (${delta})`;
+    return `Flat (${delta>=0?"+":""}${delta})`;
+  }
+
+  function buildInsights(keys, overall){
+    if(state.habits.length===0){
+      return `Add habits to unlock insights.`;
+    }
+    const bestDayIdx = overall.indexOf(Math.max(...overall));
+    const worstDayIdx = overall.indexOf(Math.min(...overall));
+    const bestDay = keys[bestDayIdx];
+    const worstDay = keys[worstDayIdx];
+
+    // Most consistent habit (highest completion rate in window)
+    const rates = state.habits.map(h => {
+      const doneCount = keys.filter(k => isDone(k, h.id)).length;
+      return { id: h.id, name: h.name, color: h.color, rate: Math.round((doneCount/keys.length)*100) };
+    }).sort((a,b)=>b.rate-a.rate);
+
+    const top = rates[0];
+    const bottom = rates[rates.length-1];
+
+    // Simple “next action”
+    const nextAction = bottom.rate < 60
+      ? `Pick ONE lever habit to protect (e.g., sleep/walk/journal) and aim for 4/7 days this week.`
+      : `Raise the floor: aim for “no zero days” on your weakest habit for 7 days.`;
+
+    return `
+      <div style="display:grid; gap:10px;">
+        <div>📈 <b>Best day:</b> ${formatNiceDate(bestDay)} (${overall[bestDayIdx]}%)</div>
+        <div>📉 <b>Lowest day:</b> ${formatNiceDate(worstDay)} (${overall[worstDayIdx]}%)</div>
+        <div>✅ <b>Strongest habit:</b> <span style="color:${top.color}">${escapeHtml(top.name)}</span> (${top.rate}%)</div>
+        <div>🧱 <b>Weakest habit:</b> <span style="color:${bottom.color}">${escapeHtml(bottom.name)}</span> (${bottom.rate}%)</div>
+        <div>🎯 <b>Action:</b> ${nextAction}</div>
+      </div>
+    `;
+  }
+
+  function makeOrUpdateLineChart(existing, canvas, labels, datasets, opts){
+    const commonOptions = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: "rgba(255,255,255,0.75)" } },
+        tooltip: { enabled: true }
+      },
+      scales: {
+        x: { ticks: { color: "rgba(255,255,255,0.65)" }, grid: { color: "rgba(255,255,255,0.07)" } },
+        y: {
+          min: opts.yMin, max: opts.yMax,
+          ticks: { color: "rgba(255,255,255,0.65)" },
+          grid: { color: "rgba(255,255,255,0.07)" },
+          title: { display: true, text: opts.yTitle, color: "rgba(255,255,255,0.7)" }
+        }
+      }
+    };
+
+    if(existing){
+      existing.data.labels = labels;
+      existing.data.datasets = datasets;
+      existing.options = commonOptions;
+      existing.update();
+      return existing;
+    }
+
+    return new Chart(canvas.getContext("2d"), {
+      type: "line",
+      data: { labels, datasets },
+      options: commonOptions
+    });
+  }
+
+  // -------------------------
+  // Tabs
+  // -------------------------
+  function setTab(which){
+    const isToday = which==="today";
+    tabTodayBtn.classList.toggle("active", isToday);
+    tabAnalyticsBtn.classList.toggle("active", !isToday);
+    viewToday.classList.toggle("hide", !isToday);
+    viewAnalytics.classList.toggle("hide", isToday);
+    if(!isToday) renderAnalytics();
+  }
+  tabTodayBtn.onclick = ()=>setTab("today");
+  tabAnalyticsBtn.onclick = ()=>setTab("analytics");
+
+  // -------------------------
+  // Actions: add / export / import / reset
+  // -------------------------
+  function addHabit(name, color){
+    const trimmed = name.trim();
+    if(!trimmed) return;
+    const id = cryptoRandomId();
+    state.habits.push({ id, name: trimmed, color, createdAt: Date.now() });
+    saveState(state);
+    renderAll();
+  }
+
+  $("#addHabitBtn").onclick = ()=>{
+    addHabit($("#habitName").value, $("#habitColor").value);
+    $("#habitName").value="";
+    $("#habitName").focus();
+  };
+  $("#habitName").addEventListener("keydown",(e)=>{ if(e.key==="Enter") $("#addHabitBtn").click(); });
+
+  $("#exportBtn").onclick = ()=>{
+    const blob = new Blob([JSON.stringify(state,null,2)], { type:"application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `habit-tracker-backup-${todayKey()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  $("#importBtn").onclick = ()=>$("#importFile").click();
+  $("#importFile").onchange = async (e)=>{
+    const file = e.target.files?.[0];
+    if(!file) return;
+    try{
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      if(!parsed || typeof parsed!=="object" || !Array.isArray(parsed.habits) || typeof parsed.logs!=="object"){
+        throw new Error("Invalid backup format");
+      }
+      state = parsed;
+      saveState(state);
+      renderAll();
+      alert("Import successful!");
+    }catch(err){
+      alert("Import failed: " + (err?.message || "Unknown error"));
+    }finally{
+      e.target.value="";
+    }
+  };
+
+  $("#resetBtn").onclick = ()=>{
+    const ok = confirm("Reset EVERYTHING? This cannot be undone (unless you exported a backup).");
+    if(!ok) return;
+    state = { habits: [], logs: {} };
+    saveState(state);
+    renderAll();
+  };
+
+  windowDaysSel.onchange = ()=>{ if(!viewAnalytics.classList.contains("hide")) renderAnalytics(); };
+  trendTypeSel.onchange = ()=>{ if(!viewAnalytics.classList.contains("hide")) renderAnalytics(); };
+
+  // -------------------------
+  // Render all
+  // -------------------------
+  function renderAll(){
+    renderToday();
+    if(!viewAnalytics.classList.contains("hide")) renderAnalytics();
+  }
+
+  // Initial render
+  renderAll();
+</script>
+</body>
+</html>
